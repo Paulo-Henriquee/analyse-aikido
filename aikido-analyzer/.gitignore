@@ -1,0 +1,14 @@
+# Não commitar chaves de API configuradas
+config.js
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Backup do config original
+config.js.backup
+

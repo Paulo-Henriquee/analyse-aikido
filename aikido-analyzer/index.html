@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mestre Hikari - Análise de Movimento</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🥋 Mestre Hikari</h1>
+            <p class="subtitle">Análise de Movimento - Aikidô</p>
+        </div>
+
+        <!-- Seletor de Técnica -->
+        <div class="technique-selector">
+            <label for="technique">Selecione a técnica:</label>
+            <select id="technique">
+                <option value="ikkyo">Ikkyo (Primeiro Princípio)</option>
+                <option value="shiho-nage">Shiho-nage (Projeção nas 4 Direções)</option>
+                <option value="irimi-nage">Irimi-nage (Entrar e Projetar)</option>
+                <option value="kokyu-ho">Kokyu-ho (Exercício de Respiração)</option>
+            </select>
+        </div>
+
+        <!-- Área de Vídeo -->
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div id="status" class="status">Carregando câmera...</div>
+        </div>
+
+        <!-- Controles -->
+        <div class="controls">
+            <button id="analyze-btn" class="analyze-btn" disabled>
+                <span class="btn-icon">🔍</span>
+                <span class="btn-text">Analisar Meu Movimento</span>
+            </button>
+            <button id="toggle-camera" class="secondary-btn">
+                <span class="btn-icon">🔄</span>
+                Trocar Câmera
+            </button>
+        </div>
+
+        <!-- Área de Feedback -->
+        <div id="feedback-area" class="feedback-area hidden">
+            <div class="feedback-header">
+                <h3>💬 Feedback do Mestre Hikari</h3>
+            </div>
+            <div id="feedback-text" class="feedback-text"></div>
+            <div id="landmarks-info" class="landmarks-info"></div>
+        </div>
+
+        <!-- Audio Player (oculto) -->
+        <audio id="audio-player"></audio>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
