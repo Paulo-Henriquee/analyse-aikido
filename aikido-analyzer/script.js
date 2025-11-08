@@ -139,20 +139,99 @@ async function initMediaPipe() {
 // CÂMERA SETUP
 // ========================================
 
+async function getBackCameraDeviceId() {
+    /**
+     * Enumera câmeras e retorna o deviceId da traseira
+     * Retorna null se não encontrar
+     */
+    try {
+        debugLog('🔍 Enumerando câmeras disponíveis...', 'info');
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        debugLog(`📹 Encontradas ${videoDevices.length} câmeras`, 'info');
+        
+        // Primeiro: tentar pegar capabilities de cada câmera para identificar facingMode
+        for (const device of videoDevices) {
+            debugLog(`  - ${device.label || 'Câmera sem nome'} (ID: ${device.deviceId.substring(0, 20)}...)`, 'info');
+            
+            // Tentar pegar um stream temporário para obter settings
+            try {
+                const tempStream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: device.deviceId } }
+                });
+                
+                const track = tempStream.getVideoTracks()[0];
+                const settings = track.getSettings();
+                
+                debugLog(`    👁️ FacingMode: ${settings.facingMode || 'N/A'}`, 'info');
+                
+                // Parar stream temporário
+                track.stop();
+                
+                // Se for environment, retornar este deviceId
+                if (settings.facingMode === 'environment') {
+                    debugLog(`✅ Câmera traseira encontrada: "${device.label}"`, 'info');
+                    return device.deviceId;
+                }
+            } catch (err) {
+                debugLog(`    ⚠️ Não foi possível acessar esta câmera`, 'warn');
+            }
+        }
+        
+        // Fallback: buscar por nome (label) contendo "back", "rear", "traseira"
+        debugLog('🔄 Fallback: buscando por label...', 'info');
+        const backKeywords = ['back', 'rear', 'traseira', 'trás', 'environment'];
+        const backCamera = videoDevices.find(device => {
+            const label = device.label.toLowerCase();
+            return backKeywords.some(keyword => label.includes(keyword));
+        });
+        
+        if (backCamera) {
+            debugLog(`✅ Câmera traseira encontrada por label: "${backCamera.label}"`, 'info');
+            return backCamera.deviceId;
+        }
+        
+        debugLog('⚠️ Câmera traseira não encontrada. Usando padrão.', 'warn');
+        return null;
+        
+    } catch (error) {
+        debugLog(`❌ Erro ao enumerar câmeras: ${error.message}`, 'error');
+        return null;
+    }
+}
+
 async function initCamera() {
     try {
         debugLog('🎥 Iniciando câmera...', 'info');
         statusDiv.textContent = 'Solicitando acesso à câmera...';
         
-        const constraints = {
-            video: {
-                facingMode: facingMode, // No mobile, pode não funcionar com 'exact' na primeira vez
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        };
+        // Tentar obter deviceId da câmera traseira
+        const backCameraId = await getBackCameraDeviceId();
         
-        debugLog(`📋 Constraints: facingMode="${facingMode}"`, 'info');
+        let constraints;
+        
+        if (backCameraId) {
+            // Usar deviceId específico (MediaPipe NÃO pode sobrescrever)
+            constraints = {
+                video: {
+                    deviceId: { exact: backCameraId },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+            debugLog(`📋 Usando deviceId específico: ${backCameraId.substring(0, 20)}...`, 'info');
+        } else {
+            // Fallback para facingMode (caso enumeração falhe)
+            constraints = {
+                video: {
+                    facingMode: { ideal: facingMode },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+            debugLog(`📋 Fallback: usando facingMode="${facingMode}"`, 'warn');
+        }
         
         // 1️⃣ GETUSERMEDIA
         debugLog('1️⃣ Chamando getUserMedia...', 'info');
@@ -165,11 +244,13 @@ async function initCamera() {
         
         debugLog(`✅ getUserMedia OK!`, 'info');
         debugLog(`📹 Track label: "${videoTrack.label}"`, 'info');
-        debugLog(`🆔 DeviceId: ${settings.deviceId || 'N/A'}`, 'info');
+        debugLog(`🆔 DeviceId: ${settings.deviceId ? settings.deviceId.substring(0, 20) + '...' : 'N/A'}`, 'info');
         debugLog(`👁️ FacingMode: ${settings.facingMode || 'N/A'}`, 'info');
         debugLog(`📐 Resolução: ${settings.width}x${settings.height}`, 'info');
         
-        if (settings.facingMode !== facingMode) {
+        if (backCameraId) {
+            debugLog(`🔒 DeviceId LOCKED (MediaPipe não pode trocar)`, 'info');
+        } else if (settings.facingMode !== facingMode) {
             debugLog(`⚠️ ATENÇÃO: Pediu "${facingMode}", recebeu "${settings.facingMode}"`, 'warn');
         }
         
@@ -215,17 +296,23 @@ async function initCamera() {
             setTimeout(() => {
                 const finalVideoTrack = video.srcObject.getVideoTracks()[0];
                 const finalSettings = finalVideoTrack.getSettings();
+                const initialDeviceId = settings.deviceId;
                 
                 debugLog('6️⃣ VERIFICAÇÃO FINAL:', 'info');
                 debugLog(`📹 Track final: "${finalVideoTrack.label}"`, 'info');
                 debugLog(`👁️ FacingMode final: ${finalSettings.facingMode || 'N/A'}`, 'info');
-                debugLog(`🆔 DeviceId final: ${finalSettings.deviceId || 'N/A'}`, 'info');
+                debugLog(`🆔 DeviceId final: ${finalSettings.deviceId ? finalSettings.deviceId.substring(0, 20) + '...' : 'N/A'}`, 'info');
                 
-                if (finalSettings.facingMode !== facingMode) {
-                    debugLog(`🔴 PROBLEMA! Stream mudou de "${facingMode}" para "${finalSettings.facingMode}"`, 'error');
-                    debugLog(`🔴 MediaPipe Camera SOBRESCREVEU o stream!`, 'error');
+                // Verificar se o deviceId mudou (mais confiável que facingMode)
+                if (initialDeviceId && finalSettings.deviceId !== initialDeviceId) {
+                    debugLog(`🔴 PROBLEMA! DeviceId mudou!`, 'error');
+                    debugLog(`🔴 Inicial: ${initialDeviceId.substring(0, 20)}...`, 'error');
+                    debugLog(`🔴 Final: ${finalSettings.deviceId.substring(0, 20)}...`, 'error');
+                } else if (finalSettings.facingMode === 'environment' || finalSettings.facingMode === facingMode) {
+                    debugLog(`✅✅ SUCESSO! Câmera traseira mantida!`, 'info');
+                    debugLog(`✅✅ A correção funcionou!`, 'info');
                 } else {
-                    debugLog(`✅ Stream manteve facingMode correto!`, 'info');
+                    debugLog(`⚠️ FacingMode: ${finalSettings.facingMode} (esperado: ${facingMode})`, 'warn');
                 }
             }, 1000);
             
