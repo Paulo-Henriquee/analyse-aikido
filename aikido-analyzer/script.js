@@ -139,9 +139,10 @@ async function initMediaPipe() {
 // CÂMERA SETUP
 // ========================================
 
-async function getBackCameraDeviceId() {
+async function getBackCameraDeviceId(existingStream) {
     /**
      * Enumera câmeras e retorna o deviceId da traseira
+     * @param {MediaStream} existingStream - Stream já existente para extrair deviceId
      * Retorna null se não encontrar
      */
     try {
@@ -151,11 +152,38 @@ async function getBackCameraDeviceId() {
         
         debugLog(`📹 Encontradas ${videoDevices.length} câmeras`, 'info');
         
-        // Primeiro: tentar pegar capabilities de cada câmera para identificar facingMode
-        for (const device of videoDevices) {
-            debugLog(`  - ${device.label || 'Câmera sem nome'} (ID: ${device.deviceId.substring(0, 20)}...)`, 'info');
+        // Se já temos um stream ativo, extrair deviceId dele
+        if (existingStream) {
+            const existingTrack = existingStream.getVideoTracks()[0];
+            const existingSettings = existingTrack.getSettings();
+            const existingDeviceId = existingSettings.deviceId;
             
-            // Tentar pegar um stream temporário para obter settings
+            debugLog(`🔎 Stream atual: "${existingTrack.label}"`, 'info');
+            debugLog(`🔎 DeviceId atual: ${existingDeviceId ? existingDeviceId.substring(0, 20) + '...' : 'N/A'}`, 'info');
+            
+            if (existingSettings.facingMode === 'environment') {
+                debugLog(`✅ Stream atual JÁ É traseira! Usando deviceId dele.`, 'info');
+                return existingDeviceId;
+            }
+        }
+        
+        // Procurar câmera traseira por label (agora que temos permissão, labels aparecem)
+        debugLog('🔍 Procurando câmera traseira por label...', 'info');
+        const backKeywords = ['back', 'rear', 'traseira', 'trás', 'tripla traseira', 'triple'];
+        
+        for (const device of videoDevices) {
+            const label = device.label.toLowerCase();
+            debugLog(`  - "${device.label}" (ID: ${device.deviceId.substring(0, 20)}...)`, 'info');
+            
+            if (backKeywords.some(keyword => label.includes(keyword))) {
+                debugLog(`✅ Câmera traseira encontrada por label: "${device.label}"`, 'info');
+                return device.deviceId;
+            }
+        }
+        
+        // Fallback: tentar pegar settings de cada câmera
+        debugLog('🔄 Fallback: testando facingMode de cada câmera...', 'info');
+        for (const device of videoDevices) {
             try {
                 const tempStream = await navigator.mediaDevices.getUserMedia({
                     video: { deviceId: { exact: device.deviceId } }
@@ -164,32 +192,19 @@ async function getBackCameraDeviceId() {
                 const track = tempStream.getVideoTracks()[0];
                 const settings = track.getSettings();
                 
-                debugLog(`    👁️ FacingMode: ${settings.facingMode || 'N/A'}`, 'info');
+                debugLog(`    "${device.label}" → FacingMode: ${settings.facingMode || 'N/A'}`, 'info');
                 
                 // Parar stream temporário
                 track.stop();
                 
                 // Se for environment, retornar este deviceId
                 if (settings.facingMode === 'environment') {
-                    debugLog(`✅ Câmera traseira encontrada: "${device.label}"`, 'info');
+                    debugLog(`✅ Câmera traseira encontrada por facingMode: "${device.label}"`, 'info');
                     return device.deviceId;
                 }
             } catch (err) {
-                debugLog(`    ⚠️ Não foi possível acessar esta câmera`, 'warn');
+                debugLog(`    ⚠️ Erro ao testar: ${err.message}`, 'warn');
             }
-        }
-        
-        // Fallback: buscar por nome (label) contendo "back", "rear", "traseira"
-        debugLog('🔄 Fallback: buscando por label...', 'info');
-        const backKeywords = ['back', 'rear', 'traseira', 'trás', 'environment'];
-        const backCamera = videoDevices.find(device => {
-            const label = device.label.toLowerCase();
-            return backKeywords.some(keyword => label.includes(keyword));
-        });
-        
-        if (backCamera) {
-            debugLog(`✅ Câmera traseira encontrada por label: "${backCamera.label}"`, 'info');
-            return backCamera.deviceId;
         }
         
         debugLog('⚠️ Câmera traseira não encontrada. Usando padrão.', 'warn');
@@ -206,13 +221,39 @@ async function initCamera() {
         debugLog('🎥 Iniciando câmera...', 'info');
         statusDiv.textContent = 'Solicitando acesso à câmera...';
         
-        // Tentar obter deviceId da câmera traseira
-        const backCameraId = await getBackCameraDeviceId();
+        // ETAPA 1: Pedir permissão inicial com facingMode (para desbloquear labels)
+        debugLog('1️⃣ Pedindo permissão inicial com facingMode...', 'info');
+        const initialConstraints = {
+            video: {
+                facingMode: facingMode,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
         
+        let initialStream = await navigator.mediaDevices.getUserMedia(initialConstraints);
+        const initialTrack = initialStream.getVideoTracks()[0];
+        const initialSettings = initialTrack.getSettings();
+        
+        debugLog(`✅ Permissão concedida!`, 'info');
+        debugLog(`📹 Stream inicial: "${initialTrack.label}"`, 'info');
+        debugLog(`👁️ FacingMode: ${initialSettings.facingMode || 'N/A'}`, 'info');
+        
+        // ETAPA 2: Agora enumerar câmeras (labels disponíveis após permissão)
+        debugLog('2️⃣ Enumerando câmeras (labels agora disponíveis)...', 'info');
+        const backCameraId = await getBackCameraDeviceId(initialStream);
+        
+        let finalStream;
         let constraints;
         
-        if (backCameraId) {
-            // Usar deviceId específico (MediaPipe NÃO pode sobrescrever)
+        if (backCameraId && backCameraId !== initialSettings.deviceId) {
+            // ETAPA 3: Recriar stream com deviceId LOCKED
+            debugLog('3️⃣ Recriando stream com deviceId LOCKED...', 'info');
+            
+            // Parar stream inicial
+            initialTrack.stop();
+            
+            // Criar novo stream com deviceId específico
             constraints = {
                 video: {
                     deviceId: { exact: backCameraId },
@@ -220,46 +261,46 @@ async function initCamera() {
                     height: { ideal: 720 }
                 }
             };
+            
             debugLog(`📋 Usando deviceId específico: ${backCameraId.substring(0, 20)}...`, 'info');
+            finalStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+        } else if (backCameraId && backCameraId === initialSettings.deviceId) {
+            // Stream inicial já é o correto!
+            debugLog('3️⃣ Stream inicial já é a câmera traseira! Mantendo...', 'info');
+            finalStream = initialStream;
+            
         } else {
-            // Fallback para facingMode (caso enumeração falhe)
-            constraints = {
-                video: {
-                    facingMode: { ideal: facingMode },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            };
-            debugLog(`📋 Fallback: usando facingMode="${facingMode}"`, 'warn');
+            // Fallback: manter stream inicial (não conseguimos identificar traseira)
+            debugLog('3️⃣ Não identificou traseira. Usando stream inicial.', 'warn');
+            finalStream = initialStream;
         }
         
-        // 1️⃣ GETUSERMEDIA
-        debugLog('1️⃣ Chamando getUserMedia...', 'info');
-        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = finalStream;
         
-        // Analisar stream retornado
+        // Analisar stream final
         const videoTrack = currentStream.getVideoTracks()[0];
         const settings = videoTrack.getSettings();
         const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
         
-        debugLog(`✅ getUserMedia OK!`, 'info');
+        debugLog(`✅ Stream final definido!`, 'info');
         debugLog(`📹 Track label: "${videoTrack.label}"`, 'info');
         debugLog(`🆔 DeviceId: ${settings.deviceId ? settings.deviceId.substring(0, 20) + '...' : 'N/A'}`, 'info');
         debugLog(`👁️ FacingMode: ${settings.facingMode || 'N/A'}`, 'info');
         debugLog(`📐 Resolução: ${settings.width}x${settings.height}`, 'info');
         
         if (backCameraId) {
-            debugLog(`🔒 DeviceId LOCKED (MediaPipe não pode trocar)`, 'info');
-        } else if (settings.facingMode !== facingMode) {
-            debugLog(`⚠️ ATENÇÃO: Pediu "${facingMode}", recebeu "${settings.facingMode}"`, 'warn');
+            debugLog(`🔒 DeviceId LOCKED (MediaPipe não pode trocar!)`, 'info');
+        } else {
+            debugLog(`⚠️ DeviceId não foi locked (MediaPipe pode sobrescrever)`, 'warn');
         }
         
-        // 2️⃣ SETAR VIDEO.SRCOBJECT
-        debugLog('2️⃣ Setando video.srcObject...', 'info');
+        // 4️⃣ SETAR VIDEO.SRCOBJECT
+        debugLog('4️⃣ Setando video.srcObject...', 'info');
         video.srcObject = currentStream;
         
         video.addEventListener('loadeddata', async () => {
-            debugLog('3️⃣ Vídeo carregado (loadeddata)', 'info');
+            debugLog('5️⃣ Vídeo carregado (loadeddata)', 'info');
             
             // Verificar se o stream ainda é o mesmo
             const currentVideoTrack = video.srcObject.getVideoTracks()[0];
@@ -276,8 +317,8 @@ async function initCamera() {
             
             debugLog(`📐 Canvas: ${canvas.width}x${canvas.height}`, 'info');
             
-            // 4️⃣ CRIAR MEDIAPIPE CAMERA
-            debugLog('4️⃣ Criando MediaPipe Camera...', 'info');
+            // 6️⃣ CRIAR MEDIAPIPE CAMERA
+            debugLog('6️⃣ Criando MediaPipe Camera...', 'info');
             camera = new Camera(video, {
                 onFrame: async () => {
                     await pose.send({ image: video });
@@ -288,8 +329,8 @@ async function initCamera() {
             
             debugLog('✅ MediaPipe Camera criado', 'info');
             
-            // 5️⃣ INICIAR MEDIAPIPE CAMERA
-            debugLog('5️⃣ Iniciando camera.start()...', 'info');
+            // 7️⃣ INICIAR MEDIAPIPE CAMERA
+            debugLog('7️⃣ Iniciando camera.start()...', 'info');
             camera.start();
             
             // Aguardar um pouco e verificar novamente
@@ -298,7 +339,7 @@ async function initCamera() {
                 const finalSettings = finalVideoTrack.getSettings();
                 const initialDeviceId = settings.deviceId;
                 
-                debugLog('6️⃣ VERIFICAÇÃO FINAL:', 'info');
+                debugLog('8️⃣ VERIFICAÇÃO FINAL:', 'info');
                 debugLog(`📹 Track final: "${finalVideoTrack.label}"`, 'info');
                 debugLog(`👁️ FacingMode final: ${finalSettings.facingMode || 'N/A'}`, 'info');
                 debugLog(`🆔 DeviceId final: ${finalSettings.deviceId ? finalSettings.deviceId.substring(0, 20) + '...' : 'N/A'}`, 'info');
