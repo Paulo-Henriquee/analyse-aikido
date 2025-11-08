@@ -859,7 +859,7 @@ toggleCameraBtn.addEventListener('click', async () => {
         // Solicitar nova câmera com facingMode correto
         const constraints = {
             video: {
-                facingMode: { exact: facingMode }, // exact força a câmera específica
+                facingMode: facingMode, // Sem 'exact' para melhor compatibilidade mobile
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             }
