@@ -1,0 +1,12 @@
+{
+  "name": "mestre-hikari-analyzer",
+  "version": "1.0.0",
+  "description": "Mestre Hikari - Análise de Movimento com MediaPipe e GPT-4o Vision",
+  "scripts": {
+    "start": "npx serve -s . -l 3000"
+  },
+  "keywords": ["aikido", "mediapipe", "gpt4", "computer-vision"],
+  "author": "Paulo Henrique",
+  "license": "MIT"
+}
+
