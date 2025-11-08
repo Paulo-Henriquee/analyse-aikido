@@ -12,7 +12,7 @@ let camera;
 let currentStream;
 let isAnalyzing = false;
 let lastPoseData = null;
-let facingMode = 'environment'; // 'user' (frontal) ou 'environment' (traseira)
+let facingMode = 'environment'; // 'user' (frontal) ou 'environment' (traseira) - FIXO EM TRASEIRA
 
 // Elementos DOM
 const video = document.getElementById('video');
@@ -20,12 +20,13 @@ const canvas = document.getElementById('canvas');
 const canvasCtx = canvas.getContext('2d');
 const statusDiv = document.getElementById('status');
 const analyzeBtn = document.getElementById('analyze-btn');
-//const toggleCameraBtn = document.getElementById('toggle-camera');
+// const toggleCameraBtn = document.getElementById('toggle-camera'); // Removido - câmera fixa
 const techniqueSelect = document.getElementById('technique');
 const feedbackArea = document.getElementById('feedback-area');
 const feedbackText = document.getElementById('feedback-text');
 const landmarksInfo = document.getElementById('landmarks-info');
 const audioPlayer = document.getElementById('audio-player');
+const playAudioBtn = document.getElementById('play-audio-btn');
 
 // ========================================
 // INICIALIZAÇÃO
@@ -802,17 +803,55 @@ async function generateAndPlayAudio(text) {
         const audioUrl = URL.createObjectURL(audioBlob);
         
         audioPlayer.src = audioUrl;
-        await audioPlayer.play();
         
+        // Tentar tocar o áudio (pode ser bloqueado em mobile)
+        try {
+            const playPromise = audioPlayer.play();
+            
+            if (playPromise !== undefined) {
+                await playPromise;
+                
+                // ✅ Autoplay funcionou!
+                if (CONFIG.DEBUG) {
+                    console.log('🔊 Áudio gerado e reproduzindo (autoplay OK)');
+                }
+                
+                // Ocultar botão de fallback se estiver visível
+                playAudioBtn.classList.add('hidden');
+                
+            }
+        } catch (autoplayError) {
+            // ❌ Autoplay bloqueado (comum em mobile)
+            console.warn('⚠️ Autoplay bloqueado pelo navegador. Mostrando botão manual.', autoplayError);
+            
+            // Mostrar botão de fallback
+            playAudioBtn.classList.remove('hidden');
+            
+            // Configurar botão para tocar o áudio quando clicado
+            playAudioBtn.onclick = async () => {
+                try {
+                    await audioPlayer.play();
+                    playAudioBtn.classList.add('hidden');
+                    
+                    if (CONFIG.DEBUG) {
+                        console.log('🔊 Áudio iniciado manualmente pelo usuário');
+                    }
+                } catch (err) {
+                    console.error('❌ Erro ao tocar áudio manualmente:', err);
+                    alert('Erro ao reproduzir áudio. Tente novamente.');
+                }
+            };
+            
+            statusDiv.textContent = '⚠️ Toque no botão para ouvir o Mestre';
+        }
+        
+        // Listener para quando o áudio terminar
         audioPlayer.onended = () => {
             statusDiv.textContent = 'Pronto para nova análise';
             statusDiv.classList.remove('speaking');
             statusDiv.classList.add('detecting');
+            playAudioBtn.classList.add('hidden'); // Ocultar botão quando terminar
         };
-        
-        if (CONFIG.DEBUG) {
-            console.log('🔊 Áudio gerado e reproduzindo');
-        }
         
     } catch (error) {
         console.error('❌ Erro ao gerar áudio:', error);
@@ -907,3 +946,4 @@ toggleCameraBtn.addEventListener('click', async () => {
     }
 });
 */
+

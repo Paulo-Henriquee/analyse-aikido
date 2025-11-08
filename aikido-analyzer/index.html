@@ -51,7 +51,12 @@
         </div>
 
         <!-- Audio Player (oculto) -->
-        <audio id="audio-player"></audio>
+        <audio id="audio-player" playsinline preload="auto"></audio>
+        
+        <!-- Botão de fallback para áudio (caso autoplay seja bloqueado em mobile) -->
+        <button id="play-audio-btn" class="play-audio-btn hidden">
+            🔊 Tocar Áudio do Mestre
+        </button>
     </div>
 
     <!-- Scripts -->
