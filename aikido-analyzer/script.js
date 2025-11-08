@@ -1,6 +1,11 @@
 /**
  * 🥋 MESTRE HIKARI - ANÁLISE DE MOVIMENTO
  * MediaPipe Pose + GPT-4 Vision + ElevenLabs
+ * 
+ * ARQUITETURA DE CÂMERA:
+ * - Usa processamento MANUAL de frames (requestAnimationFrame)
+ * - NÃO usa MediaPipe Camera() (ele sobrescreve o stream)
+ * - Controle total do deviceId para câmera traseira no iOS
  */
 
 // ========================================
@@ -8,11 +13,12 @@
 // ========================================
 
 let pose;
-let camera;
+let camera; // DEPRECATED - não usado mais (processamento manual)
 let currentStream;
 let isAnalyzing = false;
 let lastPoseData = null;
 let facingMode = 'environment'; // 'user' (frontal) ou 'environment' (traseira) - FIXO EM TRASEIRA
+let frameProcessingActive = false; // Controla o loop de processamento manual
 
 // Elementos DOM
 const video = document.getElementById('video');
@@ -299,6 +305,13 @@ async function initCamera() {
         debugLog('4️⃣ Setando video.srcObject...', 'info');
         video.srcObject = currentStream;
         
+        // Garantir que o vídeo vai tocar (necessário para processamento)
+        video.addEventListener('loadedmetadata', () => {
+            video.play().catch(err => {
+                debugLog(`⚠️ Autoplay bloqueado: ${err.message}`, 'warn');
+            });
+        }, { once: true });
+        
         video.addEventListener('loadeddata', async () => {
             debugLog('5️⃣ Vídeo carregado (loadeddata)', 'info');
             
@@ -317,41 +330,35 @@ async function initCamera() {
             
             debugLog(`📐 Canvas: ${canvas.width}x${canvas.height}`, 'info');
             
-            // 6️⃣ CRIAR MEDIAPIPE CAMERA
-            debugLog('6️⃣ Criando MediaPipe Camera...', 'info');
-            camera = new Camera(video, {
-                onFrame: async () => {
-                    await pose.send({ image: video });
-                },
-                width: 1280,
-                height: 720
-            });
+            // 6️⃣ INICIAR PROCESSAMENTO MANUAL (sem usar MediaPipe Camera)
+            debugLog('6️⃣ Iniciando processamento manual de frames...', 'info');
+            debugLog('🔧 MediaPipe Camera NÃO será usado (controle manual do stream)', 'info');
             
-            debugLog('✅ MediaPipe Camera criado', 'info');
+            // Iniciar loop manual
+            startFrameProcessing();
             
-            // 7️⃣ INICIAR MEDIAPIPE CAMERA
-            debugLog('7️⃣ Iniciando camera.start()...', 'info');
-            camera.start();
+            debugLog('✅ Loop de processamento iniciado!', 'info');
             
-            // Aguardar um pouco e verificar novamente
+            // Aguardar um pouco e verificar se o stream se manteve
             setTimeout(() => {
                 const finalVideoTrack = video.srcObject.getVideoTracks()[0];
                 const finalSettings = finalVideoTrack.getSettings();
                 const initialDeviceId = settings.deviceId;
                 
-                debugLog('8️⃣ VERIFICAÇÃO FINAL:', 'info');
+                debugLog('7️⃣ VERIFICAÇÃO FINAL:', 'info');
                 debugLog(`📹 Track final: "${finalVideoTrack.label}"`, 'info');
                 debugLog(`👁️ FacingMode final: ${finalSettings.facingMode || 'N/A'}`, 'info');
                 debugLog(`🆔 DeviceId final: ${finalSettings.deviceId ? finalSettings.deviceId.substring(0, 20) + '...' : 'N/A'}`, 'info');
                 
                 // Verificar se o deviceId mudou (mais confiável que facingMode)
                 if (initialDeviceId && finalSettings.deviceId !== initialDeviceId) {
-                    debugLog(`🔴 PROBLEMA! DeviceId mudou!`, 'error');
+                    debugLog(`🔴 PROBLEMA! DeviceId mudou mesmo com processamento manual!`, 'error');
                     debugLog(`🔴 Inicial: ${initialDeviceId.substring(0, 20)}...`, 'error');
                     debugLog(`🔴 Final: ${finalSettings.deviceId.substring(0, 20)}...`, 'error');
                 } else if (finalSettings.facingMode === 'environment' || finalSettings.facingMode === facingMode) {
-                    debugLog(`✅✅ SUCESSO! Câmera traseira mantida!`, 'info');
-                    debugLog(`✅✅ A correção funcionou!`, 'info');
+                    debugLog(`✅✅✅ SUCESSO TOTAL! Câmera traseira mantida!`, 'info');
+                    debugLog(`✅✅✅ Processamento manual funcionou!`, 'info');
+                    debugLog(`🎯 Stream: ${finalVideoTrack.label}`, 'info');
                 } else {
                     debugLog(`⚠️ FacingMode: ${finalSettings.facingMode} (esperado: ${facingMode})`, 'warn');
                 }
@@ -409,6 +416,56 @@ function onPoseResults(results) {
     }
     
     canvasCtx.restore();
+}
+
+// ========================================
+// PROCESSAMENTO MANUAL DE FRAMES
+// ========================================
+
+async function processVideoFrame() {
+    /**
+     * Loop manual de processamento de frames
+     * Substitui o MediaPipe Camera() para manter controle do stream
+     */
+    if (!frameProcessingActive) {
+        debugLog('⏹️ Loop de processamento parado', 'info');
+        return;
+    }
+    
+    // Verificar se o vídeo está pronto
+    if (video.readyState >= video.HAVE_CURRENT_DATA) {
+        try {
+            // Enviar frame atual para o MediaPipe Pose
+            await pose.send({ image: video });
+        } catch (error) {
+            console.error('Erro ao processar frame:', error);
+        }
+    }
+    
+    // Continuar loop
+    requestAnimationFrame(processVideoFrame);
+}
+
+function startFrameProcessing() {
+    /**
+     * Inicia o loop manual de processamento
+     */
+    if (frameProcessingActive) {
+        debugLog('⚠️ Loop já está ativo', 'warn');
+        return;
+    }
+    
+    debugLog('▶️ Iniciando loop manual de processamento de frames', 'info');
+    frameProcessingActive = true;
+    processVideoFrame();
+}
+
+function stopFrameProcessing() {
+    /**
+     * Para o loop manual de processamento
+     */
+    debugLog('⏹️ Parando loop de processamento', 'info');
+    frameProcessingActive = false;
 }
 
 // ========================================
