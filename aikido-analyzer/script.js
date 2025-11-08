@@ -80,7 +80,7 @@ async function initCamera() {
         
         const constraints = {
             video: {
-                facingMode: facingMode,
+                facingMode: facingMode, // No mobile, pode não funcionar com 'exact' na primeira vez
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             }
@@ -836,24 +836,72 @@ toggleCameraBtn.addEventListener('click', async () => {
     // Trocar entre câmera frontal e traseira
     facingMode = facingMode === 'user' ? 'environment' : 'user';
     
-    // Parar câmera atual
-    if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
+    console.log(`🔄 Trocando para: ${facingMode === 'user' ? 'frontal' : 'traseira'}`);
+    
+    try {
+        // Parar câmera atual
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        
+        // Parar MediaPipe temporariamente
+        if (camera) {
+            camera.stop();
+        }
+        
+        // Limpar stream
+        video.srcObject = null;
+        currentStream = null;
+        
+        // Aguardar um pouco antes de reiniciar
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Solicitar nova câmera com facingMode correto
+        const constraints = {
+            video: {
+                facingMode: { exact: facingMode }, // exact força a câmera específica
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+        
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        
+        // Aguardar vídeo carregar
+        await new Promise(resolve => {
+            video.addEventListener('loadeddata', resolve, { once: true });
+        });
+        
+        // Reconfigurar canvas
+        const containerWidth = video.parentElement.offsetWidth;
+        const containerHeight = video.parentElement.offsetHeight;
+        canvas.width = containerWidth;
+        canvas.height = containerHeight;
+        
+        // Reiniciar MediaPipe Camera
+        camera = new Camera(video, {
+            onFrame: async () => {
+                await pose.send({ image: video });
+            },
+            width: 1280,
+            height: 720
+        });
+        
+        camera.start();
+        statusDiv.textContent = 'Câmera ativa - Posicione-se';
+        statusDiv.classList.add('detecting');
+        
+        console.log(`✅ Câmera ${facingMode === 'user' ? 'frontal' : 'traseira'} ativada`);
+        
+    } catch (error) {
+        console.error('❌ Erro ao trocar câmera:', error);
+        
+        // Se falhar com exact, tentar sem exact
+        facingMode = facingMode === 'user' ? 'environment' : 'user';
+        await initCamera();
+    } finally {
+        toggleCameraBtn.disabled = false;
     }
-    
-    // Parar MediaPipe temporariamente
-    if (camera) {
-        camera.stop();
-    }
-    
-    // Aguardar um pouco antes de reiniciar (evita piscar)
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Reiniciar com nova câmera
-    await initCamera();
-    
-    toggleCameraBtn.disabled = false;
-    
-    console.log(`📷 Câmera trocada para: ${facingMode === 'user' ? 'frontal' : 'traseira'}`);
 });
 
