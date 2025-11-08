@@ -893,19 +893,14 @@ function createAnalysisPrompt(technique, metrics, frameCount = 1) {
     const techniques = {
         'ikkyo': {
             name: 'Ikkyo (Primeiro Princípio)',
-            focus: 'Controle do cotovelo junto ao centro, alinhamento do corpo, peso baixo e condução com o corpo inteiro.'
-        },
-        'shiho-nage': {
-            name: 'Shiho-nage (Projeção nas 4 Direções)',
-            focus: 'Elevação do braço acima da cabeça, trazer o uke para o centro, giro do corpo em bloco, movimento próximo como corte de espada.'
-        },
-        'irimi-nage': {
-            name: 'Irimi-nage (Entrar e Projetar)',
-            focus: 'Entrada no ponto cego (irimi verdadeiro), passar atrás da linha, controle da cabeça/linha, projeção descendo o peso.'
-        },
-        'kokyu-ho': {
-            name: 'Kokyu-ho (Exercício de Respiração)',
-            focus: 'Estabilidade no seiza, uso do centro e respiração, não empurrar com ombros, acompanhar o parceiro até o fim.'
+            focus: 'Controle do cotovelo junto ao centro, alinhamento do corpo, peso baixo e condução com o corpo inteiro.',
+            fundamentals: [
+                'Corpo ERETO (não inclinado para frente ou para trás)',
+                'Centro de gravidade descendo para a região da cintura/chão (hara)',
+                'Cotovelos próximos ao corpo (não abertos ou afastados)',
+                'Braços e ombros RELAXADOS (sem tensão muscular)',
+                'Cabeça erguida, olhar à frente (não abaixada)'
+            ]
         }
     };
     
@@ -926,6 +921,9 @@ function createAnalysisPrompt(technique, metrics, frameCount = 1) {
 **Foco da Técnica:**
 ${selectedTechnique.focus}
 
+**Fundamentos Essenciais do Ikkyo:**
+${selectedTechnique.fundamentals.map(f => `• ${f}`).join('\n')}
+
 **Observações Biomecânicas (última captura):**
 ${interpretations.join('\n')}
 
@@ -936,45 +934,54 @@ ${sequenceInfo}
 
 **Instruções Críticas (COMO UM SENSEI VERDADEIRO):**
 ${frameCount > 1 ? '0. Você recebeu MÚLTIPLAS IMAGENS em sequência. Analise o MOVIMENTO COMPLETO, não apenas uma pose. Observe a transição, o fluxo, a continuidade da técnica do início ao fim.\n' : ''}
-1. Se a técnica está **CORRETA/BOA**: ELOGIE primeiro! Reconheça o que está bem feito. Use frases como:
-   - "Excelente! Seu centro está firme e estável."
-   - "Muito bem! Os ombros e quadris estão alinhados perfeitamente."
-   - "Ótimo trabalho! A base está sólida."
-   - "Continue assim! O movimento está fluindo com harmonia."
-   
-2. Se a técnica está **INCORRETA/PRECISA MELHORAR**: Corrija com compaixão, mas seja direto:
-   - "Seu centro precisa baixar um pouco. Sinta as raízes na terra."
-   - "Os cotovelos estão travados. Mantenha uma leve flexão."
-   
-3. Se está **PARCIALMENTE CORRETA**: Elogie o que está bom E corrija o que precisa:
-   - "Ótimo alinhamento de ombros! Agora, abaixe o centro para maior estabilidade."
 
-4. NUNCA mencione porcentagens, números ou graus
-5. NÃO comente sobre identidade, aparência ou roupas — foque APENAS na técnica
-6. Use descrições qualitativas: "cotovelo dobrado", "centro alto", "base estreita"
-7. Dê feedback PRÁTICO e DIRETO: "Abaixe", "Alinhe", "Amplie", "Flexione"
-8. Sua resposta deve ter **no máximo 80 palavras** (seja conciso e objetivo como um sensei)
-9. METÁFORAS: Use NO MÁXIMO UMA metáfora por resposta (quando apropriado). Não encha o texto de metáforas. Exemplos:
-   - ✅ BOM: "Abaixe o centro, como raízes na terra. Amplie a base."
-   - ❌ RUIM: "Como bambu... como água... como raízes... como vento..."
-   - ✅ BOM: "Mantenha leve flexão nos cotovelos. Alinhe os ombros."
-   - Seja DIRETO e PRÁTICO, não poético demais
+1. **PRIORIDADE DE ANÁLISE** - Verifique SEMPRE estes 5 fundamentos do Ikkyo:
+   a) O corpo está ERETO ou está inclinado para frente/trás?
+   b) O centro de gravidade está BAIXO (cintura/hara) ou ALTO (peito/ombros)?
+   c) Os cotovelos estão PRÓXIMOS ao corpo ou AFASTADOS/ABERTOS?
+   d) Os ombros e braços estão RELAXADOS ou há TENSÃO visível?
+   e) A cabeça está ERGUIDA (olhar à frente) ou ABAIXADA?
+
+2. **Se a técnica está CORRETA/BOA**: ELOGIE primeiro! Seja específico sobre o que está bem:
+   - "Excelente! Seu corpo está ereto e o centro bem baixo no hara."
+   - "Muito bem! Cotovelos próximos ao corpo, braços completamente relaxados."
+   - "Ótimo! Postura firme, sem tensão nos ombros, cabeça erguida."
+   - "Perfeito! O movimento flui do centro, corpo alinhado e estável."
+   
+3. **Se a técnica está INCORRETA/PRECISA MELHORAR**: Seja direto e específico nas correções:
+   - "Seu corpo está inclinado para frente. Endireite-se, mantenha o centro baixo."
+   - "Há muita tensão nos ombros e braços. Relaxe-os completamente, deixe a força vir do centro."
+   - "Seus cotovelos estão muito abertos. Aproxime-os do corpo."
+   - "Sua cabeça está abaixada. Erga-a, olhe para frente, mantenha postura ereta."
+   - "Seu centro está alto demais. Desça-o para a região do hara, sinta o peso baixar."
+   
+4. **Se está PARCIALMENTE CORRETA**: Elogie o que está bom E corrija o essencial:
+   - "Bom! Seu corpo está ereto. Porém, há tensão nos ombros - relaxe-os e baixe mais o centro."
+   - "Cotovelos bem posicionados! Mas você está inclinando para frente. Endireite o corpo."
+   - "Centro baixo, muito bem! Agora relaxe os braços e aproxime os cotovelos do corpo."
+
+5. **REGRAS FINAIS:**
+   - NUNCA mencione porcentagens, números ou graus
+   - NÃO comente sobre identidade, aparência ou roupas — foque APENAS na técnica
+   - Use linguagem qualitativa e prática: "inclinado", "tensionado", "ereto", "relaxado", "próximo", "afastado"
+   - Máximo de 80 palavras (seja conciso e direto como um sensei)
+   - SEM metáforas (ex: "raízes na terra", "força do centro")
 
 **Formato da resposta:**
 Texto direto e natural, como um sensei falando no dōjō. Sem JSON, sem formatação, sem números.
 
-**Exemplos:**
+**Exemplos de Respostas Ideais:**
 
-*Se BOM:*
-"Excelente! Seu centro está firme e bem conectado ao solo. Os ombros e quadris formam uma linha harmoniosa. Continue assim, mantendo essa estabilidade."
+*Execução BOA (todos os 5 fundamentos corretos):*
+"Excelente! Seu corpo está ereto e bem alinhado. Os cotovelos próximos ao corpo, braços completamente relaxados. O centro está baixo e estável no hara. Cabeça erguida, postura impecável. Continue assim!"
 
-*Se PRECISA CORREÇÃO:*
-"Seu centro está elevado. Abaixe-o, sentindo as raízes na terra. Os cotovelos estão travados — mantenha uma leve flexão. Amplie a base para maior estabilidade."
+*Execução com ERROS COMUNS (vários fundamentos incorretos):*
+"Seu corpo está inclinado para frente, perdendo o centro. Endireite-se. Há muita tensão nos ombros e braços - relaxe-os completamente. Aproxime os cotovelos do corpo e baixe o centro para o hara."
 
-*Se PARCIALMENTE BOM:*
-"Bom alinhamento de ombros! Agora, baixe o centro para maior estabilidade. Os cotovelos precisam de uma leve flexão. Amplie a base."
+*Execução PARCIAL (alguns fundamentos bons, outros precisam correção):*
+"Bom! Corpo ereto e cabeça bem posicionada. Porém, há tensão visível nos ombros e os cotovelos estão abertos. Relaxe os braços, aproxime os cotovelos. Deixe a força vir do centro."
 
-**LEMBRE-SE: Seja DIRETO e OBJETIVO. Uma metáfora no máximo. O aluno precisa de clareza, não poesia.**`;
+**LEMBRE-SE: Seja DIRETO, PRÁTICO e FOCADO nos 5 fundamentos do Ikkyo. O aluno precisa de clareza e instruções acionáveis, não poesia.**`;
 }
 
 // ========================================
