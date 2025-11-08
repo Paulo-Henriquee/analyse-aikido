@@ -12,7 +12,7 @@ let camera;
 let currentStream;
 let isAnalyzing = false;
 let lastPoseData = null;
-let facingMode = 'user'; // 'user' (frontal) ou 'environment' (traseira)
+let facingMode = 'environment'; // 'user' (frontal) ou 'environment' (traseira)
 
 // Elementos DOM
 const video = document.getElementById('video');
@@ -20,7 +20,7 @@ const canvas = document.getElementById('canvas');
 const canvasCtx = canvas.getContext('2d');
 const statusDiv = document.getElementById('status');
 const analyzeBtn = document.getElementById('analyze-btn');
-const toggleCameraBtn = document.getElementById('toggle-camera');
+//const toggleCameraBtn = document.getElementById('toggle-camera');
 const techniqueSelect = document.getElementById('technique');
 const feedbackArea = document.getElementById('feedback-area');
 const feedbackText = document.getElementById('feedback-text');
@@ -828,6 +828,8 @@ async function generateAndPlayAudio(text) {
 
 analyzeBtn.addEventListener('click', analyzeMovement);
 
+// Botão de trocar câmera removido - fixado em câmera traseira
+/*
 toggleCameraBtn.addEventListener('click', async () => {
     // Desabilitar botão durante troca
     toggleCameraBtn.disabled = true;
@@ -904,4 +906,4 @@ toggleCameraBtn.addEventListener('click', async () => {
         toggleCameraBtn.disabled = false;
     }
 });
-
+*/
