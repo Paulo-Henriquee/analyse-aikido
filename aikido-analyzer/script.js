@@ -28,17 +28,79 @@ const landmarksInfo = document.getElementById('landmarks-info');
 const audioPlayer = document.getElementById('audio-player');
 const playAudioBtn = document.getElementById('play-audio-btn');
 
+// Debug Panel
+const debugPanel = document.getElementById('debug-panel');
+const debugLogs = document.getElementById('debug-logs');
+const debugToggleBtn = document.getElementById('debug-toggle');
+const debugCopyBtn = document.getElementById('debug-copy');
+
+// ========================================
+// SISTEMA DE DEBUG (Mobile)
+// ========================================
+
+function debugLog(message, type = 'info') {
+    /**
+     * Adiciona log ao painel de debug na tela
+     * Tipos: 'info', 'warn', 'error'
+     */
+    const time = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = `debug-log-entry ${type}`;
+    entry.innerHTML = `<span class="debug-log-time">${time}</span>${message}`;
+    
+    debugLogs.appendChild(entry);
+    debugLogs.scrollTop = debugLogs.scrollHeight;
+    
+    // Manter no console também
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // Limitar a 50 entradas
+    while (debugLogs.children.length > 50) {
+        debugLogs.removeChild(debugLogs.firstChild);
+    }
+}
+
+// Toggle minimizar/expandir
+debugToggleBtn.addEventListener('click', () => {
+    debugPanel.classList.toggle('minimized');
+    debugToggleBtn.textContent = debugPanel.classList.contains('minimized') ? '+' : '−';
+});
+
+// Copiar logs
+debugCopyBtn.addEventListener('click', () => {
+    const allLogs = Array.from(debugLogs.children)
+        .map(entry => entry.textContent)
+        .join('\n');
+    
+    navigator.clipboard.writeText(allLogs).then(() => {
+        debugLog('✅ Logs copiados para clipboard!', 'info');
+        setTimeout(() => {
+            debugCopyBtn.textContent = '✓';
+            setTimeout(() => {
+                debugCopyBtn.textContent = '📋';
+            }, 1000);
+        }, 100);
+    }).catch(err => {
+        debugLog('❌ Erro ao copiar: ' + err.message, 'error');
+    });
+});
+
 // ========================================
 // INICIALIZAÇÃO
 // ========================================
 
 window.addEventListener('load', async () => {
+    debugLog('🥋 Mestre Hikari - Análise de Movimento inicializado', 'info');
     console.log('🥋 Mestre Hikari - Análise de Movimento inicializado');
     
     if (CONFIG.DEBUG) {
+        debugLog('🔧 Modo DEBUG ativo', 'info');
         console.log('🔧 Modo DEBUG ativo');
         console.log('📊 Configurações:', CONFIG);
     }
+    
+    debugLog(`🎯 FacingMode configurado: "${facingMode}"`, 'info');
+    debugLog('📱 Modelo: ' + (navigator.userAgent.match(/Android|iPhone|iPad/i) || ['Desktop'])[0], 'info');
     
     await initMediaPipe();
     await initCamera();
@@ -49,6 +111,7 @@ window.addEventListener('load', async () => {
 // ========================================
 
 async function initMediaPipe() {
+    debugLog('🤖 Carregando MediaPipe Pose...', 'info');
     statusDiv.textContent = 'Carregando MediaPipe...';
     
     pose = new Pose({
@@ -68,6 +131,7 @@ async function initMediaPipe() {
     
     pose.onResults(onPoseResults);
     
+    debugLog('✅ MediaPipe Pose carregado', 'info');
     console.log('✅ MediaPipe Pose carregado');
 }
 
@@ -77,6 +141,7 @@ async function initMediaPipe() {
 
 async function initCamera() {
     try {
+        debugLog('🎥 Iniciando câmera...', 'info');
         statusDiv.textContent = 'Solicitando acesso à câmera...';
         
         const constraints = {
@@ -87,10 +152,40 @@ async function initCamera() {
             }
         };
         
+        debugLog(`📋 Constraints: facingMode="${facingMode}"`, 'info');
+        
+        // 1️⃣ GETUSERMEDIA
+        debugLog('1️⃣ Chamando getUserMedia...', 'info');
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Analisar stream retornado
+        const videoTrack = currentStream.getVideoTracks()[0];
+        const settings = videoTrack.getSettings();
+        const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        
+        debugLog(`✅ getUserMedia OK!`, 'info');
+        debugLog(`📹 Track label: "${videoTrack.label}"`, 'info');
+        debugLog(`🆔 DeviceId: ${settings.deviceId || 'N/A'}`, 'info');
+        debugLog(`👁️ FacingMode: ${settings.facingMode || 'N/A'}`, 'info');
+        debugLog(`📐 Resolução: ${settings.width}x${settings.height}`, 'info');
+        
+        if (settings.facingMode !== facingMode) {
+            debugLog(`⚠️ ATENÇÃO: Pediu "${facingMode}", recebeu "${settings.facingMode}"`, 'warn');
+        }
+        
+        // 2️⃣ SETAR VIDEO.SRCOBJECT
+        debugLog('2️⃣ Setando video.srcObject...', 'info');
         video.srcObject = currentStream;
         
-        video.addEventListener('loadeddata', () => {
+        video.addEventListener('loadeddata', async () => {
+            debugLog('3️⃣ Vídeo carregado (loadeddata)', 'info');
+            
+            // Verificar se o stream ainda é o mesmo
+            const currentVideoTrack = video.srcObject.getVideoTracks()[0];
+            const currentSettings = currentVideoTrack.getSettings();
+            debugLog(`📹 Stream ativo: "${currentVideoTrack.label}"`, 'info');
+            debugLog(`👁️ FacingMode atual: ${currentSettings.facingMode || 'N/A'}`, 'info');
+            
             // Definir dimensões fixas do canvas (evita redimensionamento)
             const containerWidth = video.parentElement.offsetWidth;
             const containerHeight = video.parentElement.offsetHeight;
@@ -98,6 +193,10 @@ async function initCamera() {
             canvas.width = containerWidth;
             canvas.height = containerHeight;
             
+            debugLog(`📐 Canvas: ${canvas.width}x${canvas.height}`, 'info');
+            
+            // 4️⃣ CRIAR MEDIAPIPE CAMERA
+            debugLog('4️⃣ Criando MediaPipe Camera...', 'info');
             camera = new Camera(video, {
                 onFrame: async () => {
                     await pose.send({ image: video });
@@ -106,16 +205,39 @@ async function initCamera() {
                 height: 720
             });
             
+            debugLog('✅ MediaPipe Camera criado', 'info');
+            
+            // 5️⃣ INICIAR MEDIAPIPE CAMERA
+            debugLog('5️⃣ Iniciando camera.start()...', 'info');
             camera.start();
+            
+            // Aguardar um pouco e verificar novamente
+            setTimeout(() => {
+                const finalVideoTrack = video.srcObject.getVideoTracks()[0];
+                const finalSettings = finalVideoTrack.getSettings();
+                
+                debugLog('6️⃣ VERIFICAÇÃO FINAL:', 'info');
+                debugLog(`📹 Track final: "${finalVideoTrack.label}"`, 'info');
+                debugLog(`👁️ FacingMode final: ${finalSettings.facingMode || 'N/A'}`, 'info');
+                debugLog(`🆔 DeviceId final: ${finalSettings.deviceId || 'N/A'}`, 'info');
+                
+                if (finalSettings.facingMode !== facingMode) {
+                    debugLog(`🔴 PROBLEMA! Stream mudou de "${facingMode}" para "${finalSettings.facingMode}"`, 'error');
+                    debugLog(`🔴 MediaPipe Camera SOBRESCREVEU o stream!`, 'error');
+                } else {
+                    debugLog(`✅ Stream manteve facingMode correto!`, 'info');
+                }
+            }, 1000);
+            
             statusDiv.textContent = 'Câmera ativa - Posicione-se';
             statusDiv.classList.add('detecting');
             analyzeBtn.disabled = false;
             
-            console.log('✅ Câmera iniciada');
-            console.log(`📐 Canvas: ${canvas.width}x${canvas.height}`);
+            debugLog('✅ Câmera totalmente inicializada', 'info');
         }, { once: true }); // Garante que só execute uma vez
         
     } catch (error) {
+        debugLog(`❌ ERRO ao acessar câmera: ${error.message}`, 'error');
         console.error('❌ Erro ao acessar câmera:', error);
         statusDiv.textContent = 'Erro: Permita o acesso à câmera';
         statusDiv.style.background = 'rgba(239, 68, 68, 0.8)';
