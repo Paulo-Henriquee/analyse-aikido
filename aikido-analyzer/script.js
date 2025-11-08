@@ -34,62 +34,12 @@ const landmarksInfo = document.getElementById('landmarks-info');
 const audioPlayer = document.getElementById('audio-player');
 const playAudioBtn = document.getElementById('play-audio-btn');
 
-// Debug Panel
-const debugPanel = document.getElementById('debug-panel');
-const debugLogs = document.getElementById('debug-logs');
-const debugToggleBtn = document.getElementById('debug-toggle');
-const debugCopyBtn = document.getElementById('debug-copy');
-
-// ========================================
-// SISTEMA DE DEBUG (Mobile)
-// ========================================
-
+// Função de log simplificada (apenas console)
 function debugLog(message, type = 'info') {
-    /**
-     * Adiciona log ao painel de debug na tela
-     * Tipos: 'info', 'warn', 'error'
-     */
-    const time = new Date().toLocaleTimeString();
-    const entry = document.createElement('div');
-    entry.className = `debug-log-entry ${type}`;
-    entry.innerHTML = `<span class="debug-log-time">${time}</span>${message}`;
-    
-    debugLogs.appendChild(entry);
-    debugLogs.scrollTop = debugLogs.scrollHeight;
-    
-    // Manter no console também
-    console.log(`[${type.toUpperCase()}] ${message}`);
-    
-    // Limitar a 50 entradas
-    while (debugLogs.children.length > 50) {
-        debugLogs.removeChild(debugLogs.firstChild);
+    if (CONFIG.DEBUG) {
+        console.log(`[${type.toUpperCase()}] ${message}`);
     }
 }
-
-// Toggle minimizar/expandir
-debugToggleBtn.addEventListener('click', () => {
-    debugPanel.classList.toggle('minimized');
-    debugToggleBtn.textContent = debugPanel.classList.contains('minimized') ? '+' : '−';
-});
-
-// Copiar logs
-debugCopyBtn.addEventListener('click', () => {
-    const allLogs = Array.from(debugLogs.children)
-        .map(entry => entry.textContent)
-        .join('\n');
-    
-    navigator.clipboard.writeText(allLogs).then(() => {
-        debugLog('✅ Logs copiados para clipboard!', 'info');
-        setTimeout(() => {
-            debugCopyBtn.textContent = '✓';
-            setTimeout(() => {
-                debugCopyBtn.textContent = '📋';
-            }, 1000);
-        }, 100);
-    }).catch(err => {
-        debugLog('❌ Erro ao copiar: ' + err.message, 'error');
-    });
-});
 
 // ========================================
 // INICIALIZAÇÃO
